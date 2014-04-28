@@ -183,12 +183,12 @@ class window.Controls.dt extends window.Control
 
         for child in @children
             if not query or child.properties.header
-                $(child.dom).show()
+                child.dom.style.display = 'table-row'
             else
                 if _collect_strings(child).indexOf(query) != -1
-                    $(child.dom).show()
+                    child.dom.style.display = 'table-row'
                 else
-                    $(child.dom).hide()
+                    child.dom.style.display = 'none'
 
 
 
@@ -321,29 +321,44 @@ class window.Controls.tabs extends window.Control
 
         @lastTabIndex = 0
         """
-            <div class="control tabs">
-                <ul></ul>
-                <children>
+            <div class="control tabs ui-tabs">
+                <ul class="ui-tabs-nav"></ul>
+                <div>
+                    <children>
+                </div>
             </div>
         """
 
     setupDom: (dom) ->
         super(dom)
         @active = @properties.active
-        @headers = $(@dom).find('>ul')
+        @headers = $(@dom.children[0])
+        @bodies = $(@dom.children[1])
+
         for child in @children
             do (child) =>
                 header = $$("""<li data-index="#{child.tabIndex}"><a href="#uid-#{child.uid}">#{child.properties.title}</a></li>""")
                 @headers.append(header)
-        $(@dom).tabs({
-            beforeActivate: (e, ui) =>
-                @active = parseInt(ui.newTab.attr('data-index'))
-                @event('switch', {})
-                if not @properties.client
-                    e.preventDefault()
-            selected: @active
-        })
+
+        @headers.find('>*').click (e) =>
+            @active = parseInt($(e.target.parentNode).attr('data-index'))
+            console.log @active
+            @event('switch', {})
+            if @properties.client
+                @switch(@active)
+
+        @switch(@active)
         return this
+
+    switch: (idx) ->
+        @headers.find('>*').each (i, e) =>
+            $(e).removeClass('ui-tabs-active')
+            if parseInt($(e).attr('data-index')) == @active
+                $(e).addClass('ui-tabs-active')
+        @bodies.find('>*').each (i, e) =>
+            $(e).css(display: 'none')
+            if parseInt($(e).attr('data-index')) == @active
+                $(e).css(display: 'block')
 
     detectUpdates: () ->
         r = {}
@@ -355,7 +370,7 @@ class window.Controls.tabs extends window.Control
     wrapChild: (child) ->
         child.tabIndex = @lastTabIndex
         @lastTabIndex += 1
-        """<div data-index="#{child.tabIndex}">#{child.html}</div>"""
+        """<div data-index="#{child.tabIndex}" class="ui-tabs-panel">#{child.html}</div>"""
 
 
 class window.Controls.collapse extends window.Control

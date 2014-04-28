@@ -88,6 +88,14 @@ class Paging (UIElement):
 class Pathbox (UIElement):
     typeid = 'pathbox'
 
+    def value_get(self):
+        return self.find('textbox').value
+
+    def value_set(self, value):
+        self.find('textbox').value = value
+
+    value = property(value_get, value_set)
+
     def init(self, *args, **kwargs):
         if self.directory:
             self.dialog = self.ui.create('opendirdialog')
@@ -97,6 +105,20 @@ class Pathbox (UIElement):
         self.dialog.id = 'dialog'
         self.dialog.visible = False
 
+        self.append(self.ui.create(
+            'textbox', id='textbox',
+            style=self.style
+        ))
+
+        self.append(self.ui.create(
+            'button',
+            id='button',
+            style='mini',
+            icon='folder-close' if self.directory else 'file',
+            text=''
+        ))
+
+    @on('button', 'click')
     def on_start(self):
         self.find('dialog').navigate(os.path.split(self.value or '')[0] or '/')
         self.find('dialog').visible = True

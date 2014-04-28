@@ -123,12 +123,12 @@ class window.Controls.main__sections_root extends window.Control
             do (child) =>
                 if not @categories[child.properties.category]
                     cat = new Controls.main__sections_category(@ui, { name: child.properties.category })
-                    cat.setupDom()
+                    cat.setupDomRecursive()
                     @categories[child.properties.category] = cat
                     @tabsContainer.append(cat.dom)
 
                 tab = new Controls.main__sections_tab(@ui, $.extend(child.properties, { visible: true }))
-                tab.setupDom()
+                tab.setupDomRecursive()
                 $(tab.dom).click (e) =>
                     $(tab.dom).find('.loader').show()
                     Feedback.emit('Section activated', Class: child.properties.clsname, Name: child.properties.title)

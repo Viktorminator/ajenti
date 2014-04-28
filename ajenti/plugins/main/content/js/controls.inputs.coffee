@@ -57,10 +57,10 @@ class window.Controls.editable extends window.Control
 
     setupDom: (dom) ->
         super(dom)
-        @label = $(@dom).find('.label')
-        @input = $(@dom).find('input')
+        @label = $(@dom.children[0])
+        @input = $(@dom.children[1])
         @input.val(@properties.value or '')
-        @input.hide()
+        @input.css(display:'none')
         @input.change () => @markChanged()
         @editmode = false
         @label.click @goEditMode
@@ -117,13 +117,15 @@ class window.Controls.checkbox extends window.Control
 
     setupDom: (dom) ->
         super(dom)
-        @input = $(@dom).find('input')
-        @input.change () => @markChanged()
+        @input = @dom.children[0]
+        @input.addEventListener 'change', () =>
+            @markChanged()
+        , false
         return this
 
     detectUpdates: () ->
         r = {}
-        checked = @input.is(':checked')
+        checked = $(@input).is(':checked')
         if checked != @properties.value
             r.value = checked
         @properties.value = checked
@@ -132,19 +134,24 @@ class window.Controls.checkbox extends window.Control
 
 class window.Controls.dropdown extends window.Control
     createDom: () ->
-        """
-            <div><select class="control dropdown"></select></div>
+        options = ''
+        for i in [0...@properties.labels.length]
+            do (i) =>
+                options += """<option value="#{i}" #{if i == @properties.index then 'selected' else ''}>#{@s(@properties.labels[i])}</option>"""
+
+        return """
+            <div><select class="control dropdown">#{options}</select></div>
         """
 
     setupDom: (dom) ->
         super(dom)
-        @input = $(@dom).find('select')
+        @input = $(@dom.children[0])
         @data = []
-        for i in [0...@properties.labels.length]
-            do (i) =>
-                @input.append("""<option value="#{i}" #{if i == @properties.index then 'selected' else ''}>#{@s(@properties.labels[i])}</option>""")
 
-        @input.select2()
+        setTimeout () =>
+            @input.select2()
+        , 1
+
         @input.change () => @markChanged()
 
         if @properties.server
@@ -233,7 +240,7 @@ class window.Controls.fileupload extends window.Control
     setupDom: (dom) ->
         super(dom)
         @progress = new window.Controls.progressbar(@ui, {width: 750}, [])
-        @progress.setupDom()
+        @progress.setupDomRecursive()
         $(@dom).find('.pb').append($(@progress.dom))
         @input = $(@dom).find('input')[0]
         @input.addEventListener 'change', (e) =>
@@ -310,22 +317,3 @@ class window.Controls.pathbox extends window.Control
                 <children>
             </div>
         """
-
-    setupDom: (dom) ->
-        super(dom)
-        @textbox = new Controls.textbox(@ui, style: @properties.style, value: @properties.value).setupDom()
-        @button = new Controls.button(
-            @ui,
-            style: 'mini'
-            icon: if @properties.directory then 'folder-close' else 'file'
-            text: ''
-        ).setupDom()
-        @append(@textbox)
-        @append(@button)
-
-        @button.on_click = () =>
-            @event('start', {})
-        return this
-
-    detectUpdates: () ->
-        return @textbox.detectUpdates()

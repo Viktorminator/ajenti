@@ -92,7 +92,7 @@ class MainSocket (SocketPlugin):
     ui = None
 
     def on_connect(self):
-        self.compression = 'zlib'
+        self.compression = 'lzw'
         self.__updater_lock = gevent.coros.RLock()
 
         # Inject into session
@@ -159,8 +159,8 @@ class MainSocket (SocketPlugin):
                             profile_end('Handling event')
                     if self.ui.has_updates():
                         # If any updates happened due to event handlers, send these immediately
+                        self.send_ui(diff=True)
                         self.ui.clear_updates()
-                        self.send_ui()
                     else:
                         # Otherwise just ACK
                         self.send_ack()
@@ -187,9 +187,22 @@ class MainSocket (SocketPlugin):
         }
         self.emit('init', json.dumps(data))
 
-    def send_ui(self):
+    def send_ui(self, diff=False):
         profile_start('Rendering')
-        data = json.dumps(self.ui.render())
+        if diff:
+            diffs = {}
+            for e in self.ui.root.get_updated_elements():
+                diffs[e.uid] = e.render()
+            data = {
+                'type': 'diffs',
+                'data': diffs
+            }
+        else:
+            data = {
+                'type': 'full',
+                'data': self.ui.render()
+            }
+        data = json.dumps(data)
         profile_end('Rendering')
         if self.compression == 'zlib':
             data = b64encode(zlib.compress(data, 4)[2:-4])

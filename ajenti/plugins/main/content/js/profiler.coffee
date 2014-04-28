@@ -27,7 +27,8 @@ class Profiler
 
     dump: () ->
         for id of @results
-            console.log 'Profiled', id, @results[id] / 1000, 's'
+            if @results[id] > 10 
+                console.log 'Profiled', id, @results[id] / 1000, 's'
         @results = {}
 
 

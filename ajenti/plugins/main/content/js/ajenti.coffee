@@ -8,23 +8,23 @@ class window.Stream
     start: () ->
         @socket = ajentiConnectSocket('/stream')
 
-        @socket.on 'connect', () ->
+        @socket.on 'connect', () =>
             $('#connection-error').hide()
 
-        @socket.on 'auth-error', () ->
+        @socket.on 'auth-error', () =>
             console.log 'Authentication lost!'
             location.reload()
 
-        @socket.on 'reconnect_failed', () ->
+        @socket.on 'reconnect_failed', () =>
             @start()
 
-        @socket.on 'error', (err) ->
+        @socket.on 'error', (err) =>
             console.error 'Socket error:', err
 
-        @socket.on 'disconnect', () ->
+        @socket.on 'disconnect', () =>
             $('#connection-error').show()
 
-        @socket.on 'init', (data) ->
+        @socket.on 'init', (data) =>
             data = JSON.parse(data)
             @serverInfo = data
             console.group 'Welcome to Ajenti'
@@ -37,7 +37,7 @@ class window.Stream
             Feedback.emit('Login')
             ajentiCrashResume()
 
-        @socket.on 'ui', (ui) ->
+        @socket.on 'ui', (ui) =>
             console.group 'Received update'
             console.log 'Transfer size', ui.length
             if @serverInfo.compression
@@ -48,7 +48,16 @@ class window.Stream
                     ui = lzw_decode(RawDeflate.Base64.decode(ui))
                 profiler.stop()
                 console.log 'Payload size', ui.length
+
             ui = JSON.parse(ui)
+            if ui.type == 'full'
+                @lastUIPayload = ui.data
+                ui = @lastUIPayload
+            if ui.type == 'diffs'
+                for uid, e of ui.data
+                    @_patchUIPayload(@lastUIPayload, parseInt(uid), e)
+                ui = @lastUIPayload
+
             console.log 'JSON data:', ui
 
             UI.clear()
@@ -65,15 +74,15 @@ class window.Stream
             console.groupEnd()
             Loading.hide()
 
-        @socket.on 'ack', () ->
+        @socket.on 'ack', () =>
             Loading.hide()
 
-        @socket.on 'update-request', () ->
+        @socket.on 'update-request', () =>
             UI.checkForUpdates()
             UI.sendUpdates(true)
             Loading.show()
 
-        @socket.on 'progress-message', (m) ->
+        @socket.on 'progress-message', (m) =>
             console.log 'Server progress update:', m
             Loading.setMessage(m)
             if m
@@ -81,35 +90,44 @@ class window.Stream
             else
                 Loading.hide()
 
-        @socket.on 'crash', (data) ->
+        @socket.on 'crash', (data) =>
             data = JSON.parse(data)
             console.log 'CRASH:', data
             ajentiCrash(data)
             Loading.hide()
 
-        @socket.on 'security-error', () ->
+        @socket.on 'security-error', () =>
             console.log 'SECURITY ERROR'
             ajentiSecurityError()
             Loading.hide()
 
-        @socket.on 'notify', (data) ->
+        @socket.on 'notify', (data) =>
             data = JSON.parse(data)
             Notificator.notify(data.type, data.text)
 
-        @socket.on 'openTab', (data) ->
+        @socket.on 'openTab', (data) =>
             data = JSON.parse(data)
             Tabs.addTab(data.url, data.title)
 
-        @socket.on 'closeTab', (data) ->
+        @socket.on 'closeTab', (data) =>
             data = JSON.parse(data)
             Tabs.closeTab(data.url)
 
-        @socket.on 'debug', (data) ->
+        @socket.on 'debug', (data) =>
             data = JSON.parse(data)
             console.group 'Server-side profiling'
             for d of data.profiles
                 console.log d, data.profiles[d].toFixed(3), 's'
             console.groupEnd()
+
+    _patchUIPayload: (ui, uid, e) ->
+        if ui.uid == uid
+            console.log 'Patching UI element #', uid, 'with', e
+            for k, v of e
+                ui[k] = v
+        else
+            for c in ui._c
+                @_patchUIPayload(c, uid, e)
 
     send: (message) ->
         console.log 'Sending updates', message
@@ -160,9 +178,9 @@ class window.UIManager
         @_total_elements = 0
         if @ui
             @ui.broadcast('destruct')
-        $('.root *').unbind()
-        $.cleanData($('.root *'))
-        $('.root *').safeRemove()
+        $('#tab-ajenti > *').unbind()
+        $.cleanData($('#tab-ajenti > *'))
+        $('#tab-ajenti > *').safeRemove()
         #$.cache = {} # Breaks stuff
         delete @ui
 
@@ -175,7 +193,7 @@ class window.UIManager
 
         profiler.start('DOM setup')
         profiler.setupDomStats = {}
-        ui.setupDom(dom)
+        ui.setupDomRecursive(dom)
         console.log profiler.setupDomStats
         profiler.stop()
 
@@ -369,16 +387,20 @@ class window.Control
     createDom: () ->
         ""
 
-    setupDom: (dom) ->
+    setupDomRecursive: (dom) ->
         if @dom
             return
         if not dom and not @noUID
             #console.error 'Manually inflating HTML for', this
+            profiler.start('DOM manual inflation: ' + @constructor.name)
             dom = $$(@html)
+            profiler.stop()
         @dom = dom
         if @properties.visible != true and @dom and @dom.style
             @dom.style.display = 'none'
             return this
+
+        profiler.start('setupDomRecursive children')
         for child in @children
             if child.properties.visible or @requiresAllChildren
                 if child.dom
@@ -391,8 +413,17 @@ class window.Control
                     childDom = document.getElementById('uid-' + child.properties.uid)
                     if not childDom and not child.noUID
                         console.error 'Pre-generated DOM not found for', child
-                    child.setupDom(childDom)
+                    profiler.stop()
+                    child.setupDomRecursive(childDom)
+                    profiler.start('setupDomRecursive children')
+        profiler.stop()
+        
+        profiler.start('DOM setup: ' + @constructor.name)
+        @setupDom()
+        profiler.stop()
         return this
+
+    setupDom: (dom) ->
 
     destruct: () ->
 
@@ -433,6 +464,7 @@ class window.Control
         return type: 'update', uid: @uid, properties: updates
 
     append: (child) ->
+        profiler.start('Live append')
         if not @childContainer
             @childContainer = $($(@dom).find2('.--child-container')[0])
         wrapper = @wrapChildLive(child)
@@ -440,6 +472,7 @@ class window.Control
             wrapper = wrapper[0]
         if wrapper
             @childContainer.append(wrapper)
+        profiler.stop()
 
     publish: () ->
         @ui.checkForUpdates()

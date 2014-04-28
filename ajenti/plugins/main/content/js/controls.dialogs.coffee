@@ -18,7 +18,7 @@ class window.Controls.dialog extends window.Control
             @buttons = $("""<div class="buttons"></div>""")
             $(@dom).find('>.backdrop>.content').append(@buttons)
             container = new Controls.hc(@ui)
-            container.setupDom()
+            container.setupDomRecursive()
             @buttons.append container.dom
             for button in @properties.buttons
                 do (button) =>
@@ -27,7 +27,7 @@ class window.Controls.dialog extends window.Control
                             icon: button.icon
                             style: 'normal'
                         })
-                    b.setupDom()
+                    b.setupDomRecursive()
                     b.on_click = () =>
                         @event('button', button: button.id)
                     container.append(b)

@@ -330,6 +330,17 @@ class UIElement (object):
                     return True
         return False
 
+    def get_updated_elements(self):
+        if self.children_changed or self.invalidated:
+            return [self]
+        if any(self.properties_dirty.values()):
+            return [self]
+        r = []
+        if self.visible:
+            for child in self.children:
+                r.extend(child.get_updated_elements())
+        return r
+
     def clear_updates(self):
         """
         Marks all pending updates as processed

@@ -28,20 +28,22 @@ class window.Controls.tooltip extends window.Control
 
     setupDom: (dom) ->
         super(dom)
-        $(@dom.querySelector('.container')).tooltip({
-            content: () => """
-                <div class="control tooltip body">
-                    <div>
-                        #{@s(@properties.text)}
+        setTimeout () =>
+            $(@dom.children[0]).tooltip({
+                content: () => """
+                    <div class="control tooltip body">
+                        <div>
+                            #{@s(@properties.text)}
+                        </div>
+                        <div>
+                        </div>
                     </div>
-                    <div>
-                    </div>
-                </div>
-            """
-            position:
-                my: "left-15 bottom"
-                at: "center top"
-        })
+                """
+                position:
+                    my: "left-15 bottom"
+                    at: "center top"
+            })
+        , 50
 
 
 class window.Controls.icon extends window.Control
